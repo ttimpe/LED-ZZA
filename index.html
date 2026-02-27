@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LED DFI Device Editor</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app">
+      <header class="topbar panel">
+        <h1>LED DFI Editor</h1>
+        <div class="view-switch" role="tablist" aria-label="Views">
+          <button id="tabDevice" class="tab-button active" type="button" role="tab">Device</button>
+          <button id="tabFont" class="tab-button" type="button" role="tab">Font Builder</button>
+        </div>
+      </header>
+
+      <section id="deviceView" class="view-grid">
+        <section class="panel controls">
+          <h2>Device Controls</h2>
+
+          <div class="control-row" id="rowDestinationSide">
+            <label for="destinationSide">Destination side</label>
+            <select id="destinationSide">
+              <option value="right" selected>Right</option>
+              <option value="left">Left</option>
+            </select>
+          </div>
+
+          <div class="control-row" id="rowLineInput">
+            <label for="lineInput">Line number</label>
+            <input id="lineInput" type="text" maxlength="6" />
+          </div>
+
+          <div class="control-row" id="rowModeSelect">
+            <label for="dataModeSelect">Mode</label>
+            <select id="dataModeSelect">
+              <option value="manual" selected>Manual</option>
+              <option value="live">Live (EFA)</option>
+              <option value="ibis">IBIS</option>
+            </select>
+          </div>
+
+          <div class="control-row" id="rowDeviceLocation">
+            <label for="deviceLocationSelect">Device location</label>
+            <select id="deviceLocationSelect">
+              <option value="">(manual)</option>
+            </select>
+          </div>
+
+          <div class="control-row" id="rowPlatform">
+            <label for="platformSelect">Platform</label>
+            <select id="platformSelect">
+              <option value="1" selected>1</option>
+            </select>
+          </div>
+
+          <div class="control-row" id="rowDestinationSelect">
+            <label for="destinationSelect">Destination (from data)</label>
+            <select id="destinationSelect">
+              <option value="">(manual)</option>
+            </select>
+          </div>
+
+          <div class="control-row" id="rowDestinationInput">
+            <label for="destinationInput">Destination</label>
+            <input id="destinationInput" type="text" maxlength="32" />
+          </div>
+
+          <div class="control-stack" id="rowRouteStops">
+            <label for="routeStopsInput">Route stops list</label>
+            <textarea
+              id="routeStopsInput"
+              rows="6"
+              placeholder="One stop per line or comma-separated"
+            ></textarea>
+          </div>
+
+          <div class="control-row" id="rowAutoRoute">
+            <label for="autoRouteFromData">Auto route from data</label>
+            <input id="autoRouteFromData" type="checkbox" checked />
+          </div>
+
+          <div class="control-row" id="rowKurs">
+            <label for="kursInput">Kurs (IBIS)</label>
+            <input id="kursInput" type="text" maxlength="2" value="" />
+          </div>
+
+          <div class="control-stack" id="ibisControls">
+            <label for="ibisInput">IBIS telegram</label>
+            <div class="button-row">
+              <input id="ibisInput" type="text" placeholder="l1 k90 z128" />
+              <button id="ibisSendBtn" type="button">Apply IBIS</button>
+            </div>
+          </div>
+
+          <div class="button-row" id="rowRenderButton">
+            <button id="renderDevice" type="button">Render Display</button>
+          </div>
+        </section>
+
+        <section class="device-area">
+          <div class="device" id="device">
+            <div class="display-layout" id="displayLayout">
+              <div class="led-field line-field" id="lineField" aria-label="Line field"></div>
+              <div
+                class="led-field destination-field"
+                id="destinationField"
+                aria-label="Destination field"
+              ></div>
+            </div>
+          </div>
+
+          <p class="device-meta">
+            Device: 1240x455 mm, depth 244 mm | Pitch: 5.5 mm | Line: RGB (32x48) | Destination:
+            amber (48x160)
+          </p>
+        </section>
+      </section>
+
+      <section id="fontView" class="font-editor hidden">
+        <aside class="panel font-list-panel">
+          <h2>Characters</h2>
+          <div class="control-row">
+            <label for="fontSizePreset">Font size</label>
+            <select id="fontSizePreset">
+              <option value="line">Line</option>
+              <option value="small">Small</option>
+              <option value="medium" selected>Medium</option>
+              <option value="large">Large</option>
+            </select>
+          </div>
+          <div class="control-row">
+            <label for="glyphChar">Character</label>
+            <input id="glyphChar" type="text" maxlength="2" placeholder="A" />
+          </div>
+          <div class="button-row">
+            <button id="newGlyph" type="button">New/Load</button>
+            <button id="deleteGlyph" type="button" class="danger">Delete</button>
+          </div>
+          <ul id="glyphList" class="glyph-list"></ul>
+        </aside>
+
+        <section class="panel font-workspace">
+          <h2>Glyph Editor</h2>
+          <p class="canvas-meta" id="fontCanvasMeta">Medium | 14x14 | width 12</p>
+
+          <div class="font-settings">
+            <div class="control-row">
+              <label for="canvasWidth">Character width</label>
+              <input id="canvasWidth" type="number" min="1" max="64" value="14" />
+            </div>
+
+            <div class="control-row">
+              <label for="canvasHeight">Canvas height</label>
+              <input id="canvasHeight" type="number" min="6" max="64" value="14" />
+            </div>
+
+            <div class="control-row">
+              <label for="fontEditorToggle">Editor mode</label>
+              <input id="fontEditorToggle" type="checkbox" checked />
+            </div>
+          </div>
+
+          <div class="button-row">
+            <button id="saveGlyph" type="button">Save glyph</button>
+            <button id="clearFontCanvas" type="button">Clear canvas</button>
+          </div>
+
+          <div class="led-field font-canvas" id="fontCanvas" aria-label="Font canvas"></div>
+
+          <p id="saveStatus" class="status-text"></p>
+        </section>
+      </section>
+    </main>
+    <script src="app.js"></script>
+  </body>
+</html>
