@@ -121,7 +121,7 @@ async function checkLocalServerHealth() {
   const timeout = window.setTimeout(() => controller.abort(), 3000);
 
   try {
-    const response = await fetch("/api/health", {
+    const response = await fetch("api/health", {
       method: "GET",
       cache: "no-store",
       signal: controller.signal
@@ -130,7 +130,7 @@ async function checkLocalServerHealth() {
       return true;
     }
 
-    const fallback = await fetch("/api/glyphs", {
+    const fallback = await fetch("api/glyphs", {
       method: "GET",
       cache: "no-store",
       signal: controller.signal
@@ -426,7 +426,7 @@ async function saveGlyphsToFile() {
   setStatus("Saving glyphs.json...");
 
   try {
-    const response = await fetch("/api/glyphs/save", {
+    const response = await fetch("api/glyphs/save", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(glyphLibrary)
@@ -445,7 +445,7 @@ async function saveGlyphsToFile() {
 
 async function saveGlyphsToFileSilent() {
   try {
-    const response = await fetch("/api/glyphs/save", {
+    const response = await fetch("api/glyphs/save", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(glyphLibrary)
@@ -531,7 +531,7 @@ function applyGlyphStore(rawGlyphs) {
 
 async function loadDataConfig() {
   try {
-    const response = await fetch("/data.json", { cache: "no-store" });
+    const response = await fetch("data.json", { cache: "no-store" });
     if (!response.ok) {
       return false;
     }
@@ -1047,7 +1047,7 @@ async function loadGlyphsFromFile() {
   setStatus("Loading glyphs.json...");
 
   try {
-    const response = await fetch("/glyphs.json", { cache: "no-store" });
+    const response = await fetch("glyphs.json", { cache: "no-store" });
     if (!response.ok) {
       throw new Error("Load failed.");
     }
