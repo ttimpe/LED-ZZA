@@ -2134,9 +2134,7 @@ async function init() {
 
   loadDataConfig();
 
-  if (serverReachable) {
-    loadGlyphsFromFile();
-  }
+  loadGlyphsFromFile();
 }
 
 init();
