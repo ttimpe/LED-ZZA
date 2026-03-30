@@ -811,10 +811,23 @@ function resolveTripForLineAndDestination(lineRaw, destinationRaw, allowDestFall
   const lineObj = resolveLineRender(lineRaw);
   const lineTextNorm = String(lineObj.text || "").trim();
   const lineInputNorm = String(lineRaw || "").trim();
+  const normalizeLine = (value) => {
+    const raw = String(value || "").trim();
+    if (!raw) {
+      return "";
+    }
+    if (/^\d+$/.test(raw)) {
+      return String(parseInt(raw, 10));
+    }
+    return raw.toUpperCase();
+  };
+  const candidateLines = new Set([normalizeLine(lineInputNorm), normalizeLine(lineTextNorm)].filter(Boolean));
 
-  const strictTrip =
-    trips.find((t) => String(t.dest || "").trim() === destId && String(t.line || "").trim() === lineInputNorm) ||
-    trips.find((t) => String(t.dest || "").trim() === destId && String(t.line || "").trim() === lineTextNorm);
+  const strictTrip = trips.find((t) => {
+    const tripDest = String(t?.dest || "").trim();
+    const tripLine = normalizeLine(t?.line || "");
+    return tripDest === destId && candidateLines.has(tripLine);
+  });
 
   if (strictTrip) {
     return strictTrip;
@@ -828,7 +841,45 @@ function resolveTripForLineAndDestination(lineRaw, destinationRaw, allowDestFall
 }
 
 function hasTripForLineAndDestination(lineRaw, destinationRaw) {
-  return Boolean(resolveTripForLineAndDestination(lineRaw, destinationRaw, false));
+  const cfg = state.dataConfig;
+  if (!cfg) {
+    return false;
+  }
+
+  const destId = String(destinationRaw || "").trim();
+  if (!destId) {
+    return false;
+  }
+
+  const trips = Array.isArray(cfg.trips) ? cfg.trips : [];
+  const normalizeLine = (value) => {
+    const raw = String(value || "").trim();
+    if (!raw) {
+      return "";
+    }
+    if (/^\d+$/.test(raw)) {
+      return String(parseInt(raw, 10));
+    }
+    return raw.toUpperCase();
+  };
+
+  const lineRender = resolveLineRender(lineRaw);
+  const candidates = new Set([
+    normalizeLine(lineRaw),
+    normalizeLine(lineRender.text),
+    String(lineRaw || "").trim(),
+    String(lineRender.text || "").trim()
+  ].filter(Boolean));
+
+  return trips.some((t) => {
+    const tripDest = String(t?.dest || "").trim();
+    if (tripDest !== destId) {
+      return false;
+    }
+    const tripLineRaw = String(t?.line || "").trim();
+    const tripLineNorm = normalizeLine(tripLineRaw);
+    return candidates.has(tripLineRaw) || candidates.has(tripLineNorm);
+  });
 }
 
 function resolveSpecialDestinationByKurs(kursRaw) {
@@ -852,12 +903,59 @@ function resolveSpecialDestinationByKurs(kursRaw) {
   return matched?.id || null;
 }
 
+function hasKursValue(kursRaw) {
+  return String(kursRaw || "").replace(/\D/g, "").slice(0, 2).length > 0;
+}
+
 function getEffectiveDestinationId(rawDestination, kursRaw) {
   const specialDestId = resolveSpecialDestinationByKurs(kursRaw);
-  if (specialDestId) {
-    return specialDestId;
+  if (hasKursValue(kursRaw)) {
+    return String(specialDestId || "").trim();
   }
-  return String(rawDestination || "").trim();
+
+  const raw = String(rawDestination || "").trim();
+  if (!raw) {
+    return "";
+  }
+
+  const cfg = state.dataConfig;
+  const destinations = Array.isArray(cfg?.destinations) ? cfg.destinations : [];
+  const matched = destinations.find((d) => d.id === raw || d.label === raw || d.name === raw);
+  return String(matched?.id || raw).trim();
+}
+
+function isKnownDestinationRaw(rawDestination) {
+  const raw = String(rawDestination || "").trim();
+  if (!raw) {
+    return true;
+  }
+
+  const cfg = state.dataConfig;
+  const destinations = Array.isArray(cfg?.destinations) ? cfg.destinations : [];
+  return destinations.some((d) => d.id === raw || d.label === raw || d.name === raw);
+}
+
+function isSpecialDestinationId(destinationId) {
+  const id = String(destinationId || "").trim();
+  if (!id) {
+    return false;
+  }
+
+  const cfg = state.dataConfig;
+  const destinations = Array.isArray(cfg?.destinations) ? cfg.destinations : [];
+  const match = destinations.find((d) => String(d?.id || "").trim() === id);
+  return Boolean(match && Array.isArray(match?.ibis?.kurs) && match.ibis.kurs.length > 0);
+}
+
+function getRawDestinationSelection() {
+  const selected = String(destinationSelectEl?.value || "").trim();
+  if (selected) {
+    if (destinationInputEl && destinationInputEl.value !== selected) {
+      destinationInputEl.value = selected;
+    }
+    return selected;
+  }
+  return String(destinationInputEl?.value || "").trim();
 }
 
 function isTerminusForSelection(lineRaw, destinationRaw, locationCode) {
@@ -922,6 +1020,16 @@ function applyLiveIdleState() {
   routeStopsInputEl.value = "";
   state.currentLiveTrip = null;
   renderDeviceFromInputs();
+}
+
+function resetInputsOnLoad() {
+  lineInputEl.value = "";
+  destinationSelectEl.value = "";
+  destinationInputEl.value = "";
+  routeStopsInputEl.value = "";
+  kursInputEl.value = "";
+  ibisInputEl.value = "";
+  state.ibis = { line: null, kurs: null, zielNum: null };
 }
 
 async function fetchLiveDataOnce() {
@@ -1089,6 +1197,36 @@ function resolveLineRender(inputValue) {
     bg: String(lineObj.backgroundColor || state.lineSelectedColor),
     fg: String(lineObj.textColor || "#ffffff")
   };
+}
+
+function hasConfiguredLineForInput(inputValue) {
+  const raw = String(inputValue || "").trim();
+  if (!raw) {
+    return false;
+  }
+
+  const cfg = state.dataConfig;
+  if (!cfg) {
+    return false;
+  }
+
+  const lines = Array.isArray(cfg.lines) ? cfg.lines : [];
+  const trips = Array.isArray(cfg.trips) ? cfg.trips : [];
+  let lineObj = lines.find((line) => line.id === raw || line.text === raw) || null;
+
+  if (!lineObj) {
+    const trip = trips.find((t) => String(t.line || "").trim() === raw);
+    const flapsLineId = trip?.flaps?.line;
+    if (flapsLineId) {
+      lineObj = lines.find((line) => line.id === flapsLineId) || null;
+    }
+  }
+
+  if (!lineObj) {
+    return false;
+  }
+
+  return Boolean(String(lineObj.backgroundColor || "").trim() && String(lineObj.textColor || "").trim());
 }
 
 function resolveDestinationRender(inputValue) {
@@ -1620,11 +1758,16 @@ function buildAnnouncementText() {
   const lineRender = resolveLineRender(lineInputEl.value);
   const lineText = String(lineRender.text || "").trim();
   const specialDestId = resolveSpecialDestinationByKurs(kursInputEl.value);
-  const destinationId = getEffectiveDestinationId(destinationInputEl.value, kursInputEl.value);
+  const destinationId = getEffectiveDestinationId(getRawDestinationSelection(), kursInputEl.value);
   const locationCode = getSelectedLocationCode();
   const isTerminus = isTerminusForSelection(lineInputEl.value, destinationId, locationCode);
-  const isSpecialKurs = Boolean(specialDestId);
-  const isEinsatzwagen = !isSpecialKurs && Boolean(destinationId) && !hasTripForLineAndDestination(lineInputEl.value, destinationId);
+  const isSpecialKurs = Boolean(specialDestId) || isSpecialDestinationId(destinationId);
+  const canUseEinsatzFallback = hasConfiguredLineForInput(lineInputEl.value);
+  const isEinsatzwagen =
+    canUseEinsatzFallback &&
+    !isSpecialKurs &&
+    Boolean(destinationId) &&
+    !hasTripForLineAndDestination(lineInputEl.value, destinationId);
   const lineAnnouncement = isEinsatzwagen ? "Einsatzwagen" : `Linie ${lineText}`;
   const destinationText = resolveDestinationPhonetic(destinationId);
   const autoRoute = generateRouteTextFromConfig(lineInputEl.value, destinationId);
@@ -1714,10 +1857,14 @@ async function handleRenderDisplayClick() {
 function renderDeviceFromInputs() {
   clearDevicePixels();
 
+  const rawLineInput = String(lineInputEl.value || "").trim();
+  const rawDestinationSelection = getRawDestinationSelection();
+  const kursActive = hasKursValue(kursInputEl.value);
+
   const lineRender = resolveLineRender(lineInputEl.value);
   const lineText = String(lineRender.text || "").trim();
   const specialDestId = resolveSpecialDestinationByKurs(kursInputEl.value);
-  const destinationId = getEffectiveDestinationId(destinationInputEl.value, kursInputEl.value);
+  const destinationId = getEffectiveDestinationId(rawDestinationSelection, kursInputEl.value);
   const locationCode = getSelectedLocationCode();
   const platformCode = String(platformSelectEl.value || "").trim();
   const isRthPlatform2Default =
@@ -1750,18 +1897,40 @@ function renderDeviceFromInputs() {
   }
 
   const isTerminus = isTerminusForSelection(lineInputEl.value, destinationId, locationCode);
-  const isSpecialKurs = Boolean(specialDestId);
-  const isSpecialNichtEinsteigen = specialDestId === "NICHT_EINSTEIGEN";
-  const isEinsatzwagen = !isSpecialKurs && Boolean(destinationId) && !hasTripForLineAndDestination(lineInputEl.value, destinationId);
-  const displayLineText = isTerminus ? "" : isSpecialKurs ? "" : isEinsatzwagen ? "E" : lineText;
+  const isSpecialKurs = Boolean(specialDestId) || isSpecialDestinationId(destinationId);
+  const isSpecialNichtEinsteigen = destinationId === "NICHT_EINSTEIGEN";
+  const hasInvalidLine = Boolean(rawLineInput) && !hasConfiguredLineForInput(rawLineInput);
+  const hasInvalidDestination = Boolean(String(rawDestinationSelection || "").trim()) && !isKnownDestinationRaw(rawDestinationSelection);
+  const isInvalidInputState = !kursActive && (hasInvalidLine || hasInvalidDestination);
+  const canUseEinsatzFallback = hasConfiguredLineForInput(lineInputEl.value);
+  const isEinsatzwagen =
+    !isInvalidInputState &&
+    canUseEinsatzFallback &&
+    !isSpecialKurs &&
+    Boolean(destinationId) &&
+    !hasTripForLineAndDestination(lineInputEl.value, destinationId);
+  const displayLineText = isInvalidInputState ? "" : isTerminus ? "" : isSpecialKurs ? "" : isEinsatzwagen ? "E" : lineText;
   const lineBgColor = lineRender.bg || state.lineSelectedColor;
   const lineFgColor = lineRender.fg || "#ffffff";
 
   const terminusLines = ["NICHT EINSTEIGEN", "ZUG ENDET HIER"];
-  const destinationText = isTerminus ? terminusLines.join("\n") : resolveDestinationRender(destinationId);
+  const invalidInputText =
+    String(state.dataConfig?.messages?.invalidInputText || "") ||
+    "Bitte auf Lautsprecherdurchsagen und Wagenbeschilderung achten";
+  const destinationText = isInvalidInputState
+    ? invalidInputText
+    : isTerminus
+      ? terminusLines.join("\n")
+      : resolveDestinationRender(destinationId);
   const autoRoute = generateRouteTextFromConfig(lineInputEl.value, destinationId);
-  const routeStopsRaw = isTerminus ? "" : isSpecialKurs ? "" : autoRoute?.displayText ?? resolveRouteStopsRender(routeStopsInputEl.value);
-  const routeStopsSegments = isTerminus || isSpecialKurs ? null : autoRoute?.displayStops || null;
+  const routeStopsRaw = isInvalidInputState
+    ? ""
+    : isTerminus
+      ? ""
+      : isSpecialKurs
+        ? ""
+        : autoRoute?.displayText ?? resolveRouteStopsRender(routeStopsInputEl.value);
+  const routeStopsSegments = isInvalidInputState || isTerminus || isSpecialKurs ? null : autoRoute?.displayStops || null;
   const destinationHeight = destinationText ? measureTextHeight(destinationText, "large") : 0;
   const destinationStartY = destinationText ? Math.max(0, DEST_ROWS - destinationHeight - 1) : DEST_ROWS;
   const topAreaMaxY = Math.max(0, destinationStartY - 1);
@@ -1800,7 +1969,31 @@ function renderDeviceFromInputs() {
   });
 
   if (destinationText) {
-    if (isTerminus) {
+    if (isInvalidInputState) {
+      const x = 5;
+      const size = "small";
+      const lineHeight = measureTextHeight("A", size);
+      const lineGap = 2;
+      let y = 4;
+      const normalized = String(destinationText)
+        .replace(/\r\n/g, "\n")
+        .replace(/\\n/g, "\n");
+      const paragraphs = normalized
+        .split("\n")
+        .filter((line) => line.length > 0);
+      const lines = [];
+      paragraphs.forEach((paragraph) => {
+        const wrapped = wrapTextToLines(paragraph, size, DEST_COLS - 2);
+        wrapped.forEach((line) => lines.push(line));
+      });
+      lines.forEach((line) => {
+        if (y + lineHeight > DEST_ROWS - 1) {
+          return;
+        }
+        drawTextToField("destination", line, size, x, y, "#ff9d00", DEST_COLS - 1);
+        y += lineHeight + lineGap;
+      });
+    } else if (isTerminus) {
       const x = 5;
       const size = "medium";
       const lineHeight = measureTextHeight("A", size);
@@ -2122,6 +2315,7 @@ async function init() {
   applyPreset(state.font.size);
 
   setupEvents();
+  resetInputsOnLoad();
   setMode("manual");
   renderDeviceLayout();
   renderGlyphList();

@@ -1611,6 +1611,16 @@
         "route": "HBF-BNS",
         "dest": "BNS"
       }
+    },
+    {
+      "line": "13",
+      "route": "RTH-SCH",
+      "dest": "SCH",
+      "flaps": {
+        "line": "L13_B",
+        "route": "RTH-SCH",
+        "dest": "SCH"
+      }
     }
   ],
   "noSmokingLineIcon": {
@@ -1672,5 +1682,8 @@
       "WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW",
       "WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW"
     ]
+  },
+  "messages": {
+    "invalidInputText": "                Bitte auf\n    Lautsprecherdurchsage\n                     und\n  Wagenbeschilderung achten"
   }
 }
